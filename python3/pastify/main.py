@@ -1,30 +1,35 @@
-from .type import Config
-from .validate import validate_config
-from PIL import ImageGrab
-from asyncio import create_task, create_subprocess_shell, subprocess
-from codecs import encode, decode
+import time
+from asyncio import create_subprocess_shell, create_task, subprocess
+from codecs import decode, encode
 from io import BytesIO
 from json import loads
 from os import makedirs, path
-import time
 from secrets import token_urlsafe
 from typing import Literal
+
 import vim  # type: ignore
+from PIL import ImageGrab
+
+from .type import Config
+from .validate import validate_config
 
 
 class Pastify(object):
     def __init__(self) -> None:
         self.nonce: str = token_urlsafe()
-        self.config: Config = vim.exec_lua('return require("pastify").getConfig()')
+        self.config: Config = vim.exec_lua(
+            'return require("pastify").getConfig()')
 
     def logger(self, msg: str, level: Literal["WARN", "INFO", "ERROR"]) -> None:
-        vim.command(f'lua vim.notify("{msg}", vim.log.levels.{level or "INFO"})')
+        vim.command(
+            f'lua vim.notify("{msg}", vim.log.levels.{level or "INFO"})')
 
     def get_path(self, relative: bool = False):
         file_path = ""
         if relative:
             # image should be created in the same directory as the current file_path
-            file_path = path.dirname(vim.exec_lua('return vim.fn.expand("%:p")'))
+            file_path = path.dirname(
+                vim.exec_lua('return vim.fn.expand("%:p")'))
         else:
             file_path = path.normpath(vim.exec_lua("return vim.fn.getcwd()"))
         # Sanitize the path to guarantee absolute path and return
@@ -72,7 +77,8 @@ class Pastify(object):
 
         if options["save"] in ["local", "local_file"]:
             if file_name == "":
-                file_name = vim.exec_lua("return vim.fn.input('File Name? ', '')")
+                file_name = vim.exec_lua(
+                    "return vim.fn.input('File Name? ', '')")
 
             file_name = path.basename(file_name)
 
@@ -82,7 +88,8 @@ class Pastify(object):
                 file_name = f"image_{timestamp}"
 
             if path.exists(
-                path.join(local_path, self.get_image_path_name(), f"{file_name}.png")
+                path.join(local_path, self.get_image_path_name(),
+                          f"{file_name}.png")
             ):
                 self.logger("File already exists.", "WARN")
                 return
@@ -94,18 +101,22 @@ class Pastify(object):
             assets_path = path.abspath(
                 path.join(local_path, self.get_image_path_name())
             )
+            image_file = path.join(assets_path, f"{file_name}.png")
+            self.logger("image_file: " + str(repr(image_file)), "INFO")
             if not self.config["opts"]["absolute_path"]:
-                self.logger("Assets path is: " + str(repr(assets_path)), "INFO")
+                self.logger("Assets path is: " +
+                            str(repr(assets_path)), "INFO")
                 self.logger("Local path is: " + str(repr(local_path)), "INFO")
                 current_file_path = path.dirname(
                     vim.exec_lua('return vim.fn.expand("%:p")')
                 )
                 assets_path = path.relpath(assets_path, current_file_path)
-                self.logger("Relative path is: " + str(repr(assets_path)), "INFO")
+                self.logger("Relative path is: " +
+                            str(repr(assets_path)), "INFO")
             placeholder_text = path.join(assets_path, f"{file_name}.png")
             if not path.exists(assets_path):
                 makedirs(assets_path)
-            img.save(placeholder_text, "PNG")
+            img.save(image_file, "PNG")
         else:
             base64_data = encode(img_bytes.getvalue(), "base64")
             base64_text = decode(base64_data, "ascii")
@@ -115,7 +126,8 @@ class Pastify(object):
 
         if filetype not in self.config["ft"]:
             filetype = self.config["opts"]["default_ft"]
-        pattern = self.config["ft"][filetype].replace("$IMG$", placeholder_text)
+        pattern = self.config["ft"][filetype].replace(
+            "$IMG$", placeholder_text)
         # check if we're in visual mode to run a different command
         if vim.eval("mode()") in ["v", "V", ""]:
             vim.command(f"normal! c{pattern}")
